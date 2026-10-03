@@ -1,3 +1,5 @@
+_scratch/
+
 # Compiled Lua sources
 luac.out
 
