@@ -1,0 +1,21 @@
+{
+  "commands": [
+    {
+      "name": "cargo check",
+      "sequence": "",
+      "command": "cargo check .",
+      "outputFile": "./.cache/cargo_check.txt",
+      "autoOpen": true,
+      "splitDirection": "right",
+      "commandName": "CargoCheck"
+    },
+    {
+      "name": "run tests",
+      "command": "cargo test",
+      "outputFile": "${LOCAL_CACHE}/cargo_test.txt",
+      "autoOpen": false,
+      "splitDirection": "bottom",
+      "commandName": "CargoTest"
+    }
+  ]
+}
