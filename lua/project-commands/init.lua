@@ -1,0 +1,158 @@
+-- Neovim plugin for running project-specific commands and displaying/editing their output
+
+local utils = require("project-commands.helpers")
+local run_command = require("project-commands.domain").run_command
+
+local default_config = {
+	commands_file = "nvim-commands.json",
+	keybind_prefix = "<leader>c",
+	autoload = true,
+	create_keybinds = true,
+	create_user_commands = true,
+	create_autocommands = true,
+	root_markers = {
+		".git",
+		"package.json",
+		"Cargo.toml",
+		"go.mod",
+		"pyproject.toml",
+		"Makefile",
+		"Justfile",
+		"nvim-commands.json",
+		"nvim-commands.lua",
+	},
+}
+
+local M = {}
+
+M.register_keybinds = function(self)
+	for i, cmd in ipairs(self.loaded_commands) do
+		local suffix = cmd.commandName
+		if not suffix or suffix == "" or suffix == "null" then
+			suffix = tostring(i)
+		end
+
+		local keybind = self.config.keybind_prefix .. suffix
+
+		-- Keybind is <prefix><commandName> if commandName is set, otherwise <prefix><index>
+		-- TODO: infer better fallback
+		vim.keymap.set("n", keybind, function()
+			run_command(cmd)
+		end, { desc = "Run: " .. (cmd.name or ("command " .. i)), silent = true })
+	end
+end
+
+M.register_project_user_commands = function(self)
+	-- commandName "CargoCheck" => :CargoCheck
+	-- commandName "cargo-check" also normalizes to :CargoCheck
+	-- If commandName is missing/null, falls back to :NvimCommand<index>
+	-- TODO: infer better fallback
+
+	for i, cmd in ipairs(self.loaded_commands) do
+		local raw_name = cmd.commandName
+		local user_cmd_name
+
+		if raw_name and raw_name ~= "" and raw_name ~= "null" then
+			user_cmd_name = utils.to_pascal_case(raw_name)
+		end
+
+		if not user_cmd_name then
+			user_cmd_name = "NvimCommand" .. i
+		end
+
+		-- Remove existing command if any (so reload picks up changes)
+		pcall(vim.api.nvim_del_user_command, user_cmd_name)
+
+		local ok, err = pcall(vim.api.nvim_create_user_command, user_cmd_name, function()
+			run_command(cmd)
+		end, { desc = "Run: " .. (cmd.name or ("command " .. i)) })
+
+		if not ok then
+			vim.notify(
+				"nvim_commands: could not register :" .. user_cmd_name .. " — " .. tostring(err),
+				vim.log.levels.WARN
+			)
+		end
+	end
+end
+
+-- Load commands from the in-project commands file (default: nvim-commands.json)
+M.load = function(self)
+	local root = utils.find_root(self.config.root_markers)
+	local commands_path = root .. "/" .. self.config.commands_file
+
+	if vim.fn.filereadable(commands_path) == 0 then
+		print("No " .. commands_path .. " found.")
+		return
+	end
+
+	local data, err = utils.read_json_file(commands_path)
+	if not data then
+		vim.notify("nvim_commands: " .. err, vim.log.levels.ERROR)
+		return
+	end
+
+	if not data.commands or type(data.commands) ~= "table" then
+		vim.notify("nvim_commands: no 'commands' array in " .. config_path, vim.log.levels.ERROR)
+	end
+
+	self.loaded_commands = data.commands or {}
+end
+
+M.register_universal_user_commands = function(self)
+	vim.api.nvim_create_user_command("NvimCommandsReload", function()
+		self:load()
+		vim.notify("Reloaded nvim_commands from config", vim.log.levels.INFO)
+	end, { desc = "Reload nvim_commands config" })
+
+	vim.api.nvim_create_user_command("NvimCommandsRun", function(opts)
+		local name = opts.args
+		for _, cmd in ipairs(M.loaded_commands) do
+			if cmd.name == name then
+				run_command(cmd)
+				return
+			end
+		end
+		vim.notify("No command named: " .. name, vim.log.levels.WARN)
+	end, { nargs = 1, desc = "Run a named command entry: `:ProjectCommandsRun NAME`" })
+end
+
+M.register_autocommands = function(self)
+	-- Reload when config file changes
+	vim.api.nvim_create_autocmd("BufWritePost", {
+		pattern = self.config.commands_file,
+		callback = function()
+			self:load()
+		end,
+	})
+
+	-- Try to load when entering a new directory
+	vim.api.nvim_create_autocmd("DirChanged", {
+		callback = function()
+			self:load()
+		end,
+	})
+end
+
+M.setup = function(opts)
+	M.config = utils.merge_opts(default_config, opts)
+
+	if M.config.autoload then
+		M:load()
+	end
+
+	if M.config.create_keybinds then
+		M:register_keybinds()
+	end
+
+	if M.config.create_user_commands then
+		M:register_universal_user_commands()
+		M:register_project_user_commands()
+	end
+
+	if M.config.create_autocommands then
+		M:register_autocommands()
+	end
+end
+
+return M
