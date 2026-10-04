@@ -31,9 +31,8 @@ local default_config = {
 			right = "l",
 			here = "o",
 			tab = "t",
-		}
-		
-	}
+		},
+	},
 }
 
 local M = {}
@@ -41,6 +40,34 @@ local M = {}
 M.register_keybinds = function(self)
 	local open_prefix = self.config.keybinds.open_prefix
 	local keybinds = self.config.keybinds
+
+	vim.keymap.set("n", open_prefix .. keybinds.open.tab, function()
+		self.open_path_under_cursor(utils.direction.tab)
+	end, { desc = "Open path under cursor in a new tab." })
+
+	vim.keymap.set("n", open_prefix .. keybinds.open.here, function()
+		self.open_path_under_cursor(utils.direction.edit)
+	end, { desc = "Open path under cursor to the edit." })
+
+	vim.keymap.set("n", open_prefix .. keybinds.open.left, function()
+		self.open_path_under_cursor(utils.direction.left)
+	end, { desc = "Open path under cursor to the left." })
+
+	vim.keymap.set("n", open_prefix .. keybinds.open.below, function()
+		self.open_path_under_cursor(utils.direction.below)
+	end, { desc = "Open path under cursor to the below." })
+
+	vim.keymap.set("n", open_prefix .. keybinds.open.above, function()
+		self.open_path_under_cursor(utils.direction.above)
+	end, { desc = "Open path under cursor to the above." })
+
+	vim.keymap.set("n", open_prefix .. keybinds.open.right, function()
+		self.open_path_under_cursor(utils.direction.right)
+	end, { desc = "Open path under cursor to the right." })
+
+	if self.loaded_commands == nil then
+		return
+	end
 
 	for i, cmd in ipairs(self.loaded_commands) do
 		local suffix = cmd.command_name
@@ -56,30 +83,6 @@ M.register_keybinds = function(self)
 			run_command(cmd)
 		end, { desc = "Run: " .. (cmd.name or ("command " .. i)), silent = true })
 	end
-
-	vim.keymap.set("n", open_prefix .. keybinds.open.tab, function()
-		self:open_path_under_cursor(utils.direction.tab)
-	end, { desc = "Open path under cursor to the tab." })
-
-	vim.keymap.set("n", open_prefix .. keybinds.open.here, function()
-		self:open_path_under_cursor(utils.direction.edit)
-	end, { desc = "Open path under cursor to the edit." })
-
-	vim.keymap.set("n", open_prefix .. keybinds.open.left, function()
-		self:open_path_under_cursor(utils.direction.left)
-	end, { desc = "Open path under cursor to the left." })
-
-	vim.keymap.set("n", open_prefix .. keybinds.open.below, function()
-		self:open_path_under_cursor(utils.direction.below)
-	end, { desc = "Open path under cursor to the below." })
-
-	vim.keymap.set("n", open_prefix .. keybinds.open.above, function()
-		self:open_path_under_cursor(utils.direction.above)
-	end, { desc = "Open path under cursor to the above." })
-
-	vim.keymap.set("n", open_prefix .. keybinds.open.right, function()
-		self:open_path_under_cursor(utils.direction.right)
-	end, { desc = "Open path under cursor to the right." })
 end
 
 M.register_project_user_commands = function(self)
@@ -87,6 +90,10 @@ M.register_project_user_commands = function(self)
 	-- command_name "cargo-check" also normalizes to :CargoCheck
 	-- If command_name is missing/null, falls back to :NvimCommand<index>
 	-- TODO: infer better fallback
+
+	if self.loaded_commands == nil then
+		return
+	end
 
 	for i, cmd in ipairs(self.loaded_commands) do
 		local raw_name = cmd.command_name
@@ -174,39 +181,39 @@ M.register_autocommands = function(self)
 	})
 end
 
-function M.open_path_under_cursor(self, direction)
-  local direction = utils:validate_direction(direction)
-  local path = vim.fn.expand("<cfile>")
-  path = vim.fn.expand(path)
+function M.open_path_under_cursor(direction)
+	local direction = utils:validate_direction(direction)
+	local path = vim.fn.expand("<cfile>")
+	path = vim.fn.expand(path)
 
-  if not vim.startswith(path, "/") then
-    path = vim.fs.joinpath(project_root, path)
-  end
+	if not vim.startswith(path, "/") then
+		path = vim.fs.joinpath(project_root, path)
+	end
 
-  path = vim.fs.normalize(vim.fn.fnamemodify(path, ":p"))
-  path = vim.fn.fnameescape(path)
+	path = vim.fs.normalize(vim.fn.fnamemodify(path, ":p"))
+	path = vim.fn.fnameescape(path)
 
-  domain.open_file(path, direction)
+	domain.open_file(path, direction)
 
---   local bufnr = utils.find_buffer_for_file(path)
+	--   local bufnr = utils.find_buffer_for_file(path)
 
---   local commands = {
---     edit = "edit",
---     right = "vsplit",
---     left = "leftabove vsplit",
---     below = "split",
---     above = "above split",
---     tab = "tabedit",
---   }
+	--   local commands = {
+	--     edit = "edit",
+	--     right = "vsplit",
+	--     left = "leftabove vsplit",
+	--     below = "split",
+	--     above = "above split",
+	--     tab = "tabedit",
+	--   }
 
---   local command = commands[direction]
+	--   local command = commands[direction]
 
---   if bufnr then
---     vim.cmd(command)
---     vim.api.nvim_win_set_buf(0, bufnr)
---   else
---     vim.cmd(command .. " " .. vim.fn.fnameescape(path))
---   end
+	--   if bufnr then
+	--     vim.cmd(command)
+	--     vim.api.nvim_win_set_buf(0, bufnr)
+	--   else
+	--     vim.cmd(command .. " " .. vim.fn.fnameescape(path))
+	--   end
 end
 
 M.setup = function(opts)
