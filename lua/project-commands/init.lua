@@ -1,7 +1,8 @@
 -- Neovim plugin for running project-specific commands and displaying/editing their output
 
 local utils = require("project-commands.helpers")
-local run_command = require("project-commands.domain").run_command
+local domain = require("project-commands.domain")
+local run_command = domain.run_command
 
 local default_config = {
 	commands_file = "nvim-commands.json",
@@ -21,11 +22,26 @@ local default_config = {
 		"nvim-commands.json",
 		"nvim-commands.lua",
 	},
+	keybinds = {
+		open_prefix = "<leader>o",
+		open = {
+			left = "h",
+			below = "j",
+			above = "k",
+			right = "l",
+			here = "o",
+			tab = "t",
+		}
+		
+	}
 }
 
 local M = {}
 
 M.register_keybinds = function(self)
+	local open_prefix = self.config.keybinds.open_prefix
+	local keybinds = self.config.keybinds
+
 	for i, cmd in ipairs(self.loaded_commands) do
 		local suffix = cmd.command_name
 		if not suffix or suffix == "" or suffix == "null" then
@@ -40,6 +56,30 @@ M.register_keybinds = function(self)
 			run_command(cmd)
 		end, { desc = "Run: " .. (cmd.name or ("command " .. i)), silent = true })
 	end
+
+	vim.keymap.set("n", open_prefix .. keybinds.open.tab, function()
+		self:open_path_under_cursor(utils.direction.tab)
+	end, { desc = "Open path under cursor to the tab." })
+
+	vim.keymap.set("n", open_prefix .. keybinds.open.here, function()
+		self:open_path_under_cursor(utils.direction.edit)
+	end, { desc = "Open path under cursor to the edit." })
+
+	vim.keymap.set("n", open_prefix .. keybinds.open.left, function()
+		self:open_path_under_cursor(utils.direction.left)
+	end, { desc = "Open path under cursor to the left." })
+
+	vim.keymap.set("n", open_prefix .. keybinds.open.below, function()
+		self:open_path_under_cursor(utils.direction.below)
+	end, { desc = "Open path under cursor to the below." })
+
+	vim.keymap.set("n", open_prefix .. keybinds.open.above, function()
+		self:open_path_under_cursor(utils.direction.above)
+	end, { desc = "Open path under cursor to the above." })
+
+	vim.keymap.set("n", open_prefix .. keybinds.open.right, function()
+		self:open_path_under_cursor(utils.direction.right)
+	end, { desc = "Open path under cursor to the right." })
 end
 
 M.register_project_user_commands = function(self)
@@ -134,8 +174,45 @@ M.register_autocommands = function(self)
 	})
 end
 
+function M.open_path_under_cursor(self, direction)
+  local direction = utils:validate_direction(direction)
+  local path = vim.fn.expand("<cfile>")
+  path = vim.fn.expand(path)
+
+  if not vim.startswith(path, "/") then
+    path = vim.fs.joinpath(project_root, path)
+  end
+
+  path = vim.fs.normalize(vim.fn.fnamemodify(path, ":p"))
+  path = vim.fn.fnameescape(path)
+
+  domain.open_file(path, direction)
+
+--   local bufnr = utils.find_buffer_for_file(path)
+
+--   local commands = {
+--     edit = "edit",
+--     right = "vsplit",
+--     left = "leftabove vsplit",
+--     below = "split",
+--     above = "above split",
+--     tab = "tabedit",
+--   }
+
+--   local command = commands[direction]
+
+--   if bufnr then
+--     vim.cmd(command)
+--     vim.api.nvim_win_set_buf(0, bufnr)
+--   else
+--     vim.cmd(command .. " " .. vim.fn.fnameescape(path))
+--   end
+end
+
 M.setup = function(opts)
 	M.config = utils.merge_opts(default_config, opts)
+
+	M.project_root = utils.find_root(M.config.root_markers)
 
 	if M.config.autoload then
 		M:load()

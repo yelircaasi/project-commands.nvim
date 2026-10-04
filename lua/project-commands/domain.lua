@@ -6,10 +6,11 @@ local failure_icon = "✗ "
 M = {}
 
 -- Open the output file in a split
-function M.open_output_file(filepath, direction)
+function M.open_file(filepath, direction)
 	local abs = vim.fn.fnamemodify(filepath, ":p")
 
 	local existing = utils.find_buffer_for_file(abs)
+	local direction = utils:validate_direction(direction)
 
 	local split_cmd
 	if direction == "left" then
@@ -84,7 +85,7 @@ function M.run_command(cmd_def, opts)
 				end
 
 				if cmd_def.auto_open and output_file ~= "" then
-					M.open_output_file(output_file, cmd_def.split_direction or "right")
+					M.open_file(output_file, cmd_def.split_direction or "right")
 				end
 			end)
 		end,
