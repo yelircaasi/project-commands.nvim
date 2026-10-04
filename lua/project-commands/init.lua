@@ -27,14 +27,14 @@ local M = {}
 
 M.register_keybinds = function(self)
 	for i, cmd in ipairs(self.loaded_commands) do
-		local suffix = cmd.commandName
+		local suffix = cmd.command_name
 		if not suffix or suffix == "" or suffix == "null" then
 			suffix = tostring(i)
 		end
 
 		local keybind = self.config.keybind_prefix .. suffix
 
-		-- Keybind is <prefix><commandName> if commandName is set, otherwise <prefix><index>
+		-- Keybind is <prefix><key_suffix> if command_name is set, otherwise <prefix><index>
 		-- TODO: infer better fallback
 		vim.keymap.set("n", keybind, function()
 			run_command(cmd)
@@ -43,13 +43,13 @@ M.register_keybinds = function(self)
 end
 
 M.register_project_user_commands = function(self)
-	-- commandName "CargoCheck" => :CargoCheck
-	-- commandName "cargo-check" also normalizes to :CargoCheck
-	-- If commandName is missing/null, falls back to :NvimCommand<index>
+	-- command_name "CargoCheck" => :CargoCheck
+	-- command_name "cargo-check" also normalizes to :CargoCheck
+	-- If command_name is missing/null, falls back to :NvimCommand<index>
 	-- TODO: infer better fallback
 
 	for i, cmd in ipairs(self.loaded_commands) do
-		local raw_name = cmd.commandName
+		local raw_name = cmd.command_name
 		local user_cmd_name
 
 		if raw_name and raw_name ~= "" and raw_name ~= "null" then

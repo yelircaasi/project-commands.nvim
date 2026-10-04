@@ -2,20 +2,20 @@
   "commands": [
     {
       "name": "cargo check",
-      "sequence": "",
+      "key_suffix": "",
       "command": "cargo check .",
-      "outputFile": "./.cache/cargo_check.txt",
-      "autoOpen": true,
-      "splitDirection": "right",
-      "commandName": "CargoCheck"
+      "output_file": "./.cache/cargo_check.txt",
+      "auto_open": true,
+      "split_direction": "right",
+      "command_name": "CargoCheck"
     },
     {
       "name": "run tests",
       "command": "cargo test",
-      "outputFile": "${LOCAL_CACHE}/cargo_test.txt",
-      "autoOpen": false,
-      "splitDirection": "bottom",
-      "commandName": "CargoTest"
+      "output_file": "${LOCAL_CACHE}/cargo_test.txt",
+      "auto_open": false,
+      "split_direction": "bottom",
+      "command_name": "CargoTest"
     }
   ]
 }

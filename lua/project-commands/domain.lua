@@ -58,12 +58,9 @@ function M.run_command(cmd_def, opts)
 		return
 	end
 
-	local output_file = utils.interpolate_variables(cmd_def.outputFile or "", context)
+	local output_file = utils.interpolate_variables(cmd_def.output_file or "", context)
 
 	local shell_cmd = raw_command
-	if cmd_def.sequence and cmd_def.sequence ~= "" then
-		shell_cmd = cmd_def.sequence .. " " .. shell_cmd
-	end
 
 	if output_file ~= "" then
 		output_file = vim.fn.fnamemodify(output_file, ":p")
@@ -86,8 +83,8 @@ function M.run_command(cmd_def, opts)
 					)
 				end
 
-				if cmd_def.autoOpen and output_file ~= "" then
-					M.open_output_file(output_file, cmd_def.splitDirection or "right")
+				if cmd_def.auto_open and output_file ~= "" then
+					M.open_output_file(output_file, cmd_def.split_direction or "right")
 				end
 			end)
 		end,
