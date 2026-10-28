@@ -1,0 +1,31 @@
+local M = {}
+
+M.commands = {
+	{
+		name = "cargo check",
+		key_suffix = "ch",
+		command = "cargo check",
+		output_file = "./.cache/cargo_check.txt",
+		auto_open = true,
+		split_direction = "right",
+		command_name = "CargoCheck",
+	},
+	{
+		name = "run tests",
+		command = "cargo test",
+		output_file = "${LOCAL_CACHE}/cargo_test.txt",
+		auto_open = false,
+		split_direction = "bottom",
+		command_name = "CargoTest",
+	},
+	{
+		name = "todos",
+		command = "rg TODO .",
+		output_file = "./.cache/todos-inline.txt",
+		auto_open = true,
+		split_direction = "right",
+		command_name = "CollectTodos",
+	},
+}
+
+return M

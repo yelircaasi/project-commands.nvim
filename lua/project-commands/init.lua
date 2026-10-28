@@ -5,7 +5,11 @@ local domain = require("project-commands.domain")
 local run_command = domain.run_command
 
 local default_config = {
-	commands_file = "nvim-commands.json",
+	commands_files = {
+		"nvim-commands.json",
+		"nvim-commands.lua",
+		"commands.lua",
+	},
 	keybind_prefix = "<leader>c",
 	autoload = true,
 	create_keybinds = true,
@@ -79,9 +83,12 @@ M.register_keybinds = function(self)
 
 		-- Keybind is <prefix><key_suffix> if command_name is set, otherwise <prefix><index>
 		-- TODO: infer better fallback
-		vim.keymap.set("n", keybind, function()
-			run_command(cmd)
-		end, { desc = "Run: " .. (cmd.name or ("command " .. i)), silent = true })
+		vim.keymap.set(
+			"n",
+			keybind,
+			helpers.as_function(cmd, run_command),
+			{ desc = "Run: " .. (cmd.name or ("command " .. i)), silent = true }
+		)
 	end
 end
 
@@ -123,17 +130,33 @@ M.register_project_user_commands = function(self)
 	end
 end
 
--- Load commands from the in-project commands file (default: nvim-commands.json)
+M.find_and_read_file = function(self)
+	for filename in self.config.commands_files do
+		local commands_path = root .. "/" .. filename
+		if helpers.endswith(commands_path, ".lua") then
+			M.commands_file = commands_path
+			return utils.read_lua_file(commands_path)
+		else
+			if helpers.endswith(commands_path, ".json") then
+				M.commands_file = commands_path
+				return utils.read_json_file(commands_path)
+			end
+		end
+		return nil, "No valid file (.lua or .json) found."
+	end
+end
+
+-- Load commands from the in-project commands file
+--     (default: nvim-commands.lua|nvim-commands.json)
 M.load = function(self)
 	local root = utils.find_root(self.config.root_markers)
-	local commands_path = root .. "/" .. self.config.commands_file
 
-	if vim.fn.filereadable(commands_path) == 0 then
-		print("No " .. commands_path .. " found.")
+	if vim.fn.filereadable(self.commands_path) == 0 then
+		print("No " .. tostring(self.commands_path) .. " found.")
 		return
 	end
 
-	local data, err = utils.read_json_file(commands_path)
+	local data, err = M.find_and_read_file()
 	if not data then
 		vim.notify("nvim_commands: " .. err, vim.log.levels.ERROR)
 		return
@@ -167,7 +190,7 @@ end
 M.register_autocommands = function(self)
 	-- Reload when config file changes
 	vim.api.nvim_create_autocmd("BufWritePost", {
-		pattern = self.config.commands_file,
+		pattern = M.commands_file,
 		callback = function()
 			self:load()
 		end,
@@ -216,13 +239,17 @@ function M.open_path_under_cursor(direction)
 	--   end
 end
 
+M.commands_file = nil
+
 M.setup = function(opts)
 	M.config = utils.merge_opts(default_config, opts)
 
 	M.project_root = utils.find_root(M.config.root_markers)
 
 	if M.config.autoload then
-		M:load()
+		M.commands_file = M:load()
+	else
+		M:find_and_read_file()
 	end
 
 	if M.config.create_keybinds then
