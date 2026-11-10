@@ -6,9 +6,11 @@ local run_command = domain.run_command
 
 local default_config = {
 	commands_files = {
-		"nvim-commands.json",
 		"nvim-commands.lua",
+		"nvim-commands.json",
 		"commands.lua",
+		"project-commands.lua",
+		"project-commands.json",
 	},
 	keybind_prefix = "<leader>c",
 	autoload = true,
@@ -23,6 +25,8 @@ local default_config = {
 		"pyproject.toml",
 		"Makefile",
 		"Justfile",
+		"Taskfile.yml",
+		"Taskfile.yaml",
 		"nvim-commands.json",
 		"nvim-commands.lua",
 	},
@@ -41,68 +45,68 @@ local default_config = {
 
 local M = {}
 
-M.register_keybinds = function(self)
-	local open_prefix = self.config.keybinds.open_prefix
-	local keybinds = self.config.keybinds
+M.register_keybinds = function()
+	local open_prefix = M.config.keybinds.open_prefix
+	local keybinds = M.config.keybinds
 
 	vim.keymap.set("n", open_prefix .. keybinds.open.tab, function()
-		self.open_path_under_cursor(utils.direction.tab)
+		M.open_path_under_cursor(utils.direction.tab)
 	end, { desc = "Open path under cursor in a new tab." })
 
 	vim.keymap.set("n", open_prefix .. keybinds.open.here, function()
-		self.open_path_under_cursor(utils.direction.edit)
+		M.open_path_under_cursor(utils.direction.edit)
 	end, { desc = "Open path under cursor to the edit." })
 
 	vim.keymap.set("n", open_prefix .. keybinds.open.left, function()
-		self.open_path_under_cursor(utils.direction.left)
+		M.open_path_under_cursor(utils.direction.left)
 	end, { desc = "Open path under cursor to the left." })
 
 	vim.keymap.set("n", open_prefix .. keybinds.open.below, function()
-		self.open_path_under_cursor(utils.direction.below)
+		M.open_path_under_cursor(utils.direction.below)
 	end, { desc = "Open path under cursor to the below." })
 
 	vim.keymap.set("n", open_prefix .. keybinds.open.above, function()
-		self.open_path_under_cursor(utils.direction.above)
+		M.open_path_under_cursor(utils.direction.above)
 	end, { desc = "Open path under cursor to the above." })
 
 	vim.keymap.set("n", open_prefix .. keybinds.open.right, function()
-		self.open_path_under_cursor(utils.direction.right)
+		M.open_path_under_cursor(utils.direction.right)
 	end, { desc = "Open path under cursor to the right." })
 
-	if self.loaded_commands == nil then
+	if M.loaded_commands == nil then
 		return
 	end
 
-	for i, cmd in ipairs(self.loaded_commands) do
+	for i, cmd in ipairs(M.loaded_commands) do
 		local suffix = cmd.command_name
 		if not suffix or suffix == "" or suffix == "null" then
 			suffix = tostring(i)
 		end
 
-		local keybind = self.config.keybind_prefix .. suffix
+		local keybind = M.config.keybind_prefix .. suffix
 
 		-- Keybind is <prefix><key_suffix> if command_name is set, otherwise <prefix><index>
 		-- TODO: infer better fallback
 		vim.keymap.set(
 			"n",
 			keybind,
-			helpers.as_function(cmd, run_command),
+			utils.as_function(cmd, run_command),
 			{ desc = "Run: " .. (cmd.name or ("command " .. i)), silent = true }
 		)
 	end
 end
 
-M.register_project_user_commands = function(self)
+M.register_project_user_commands = function()
 	-- command_name "CargoCheck" => :CargoCheck
 	-- command_name "cargo-check" also normalizes to :CargoCheck
 	-- If command_name is missing/null, falls back to :NvimCommand<index>
 	-- TODO: infer better fallback
 
-	if self.loaded_commands == nil then
+	if M.loaded_commands == nil then
 		return
 	end
 
-	for i, cmd in ipairs(self.loaded_commands) do
+	for i, cmd in ipairs(M.loaded_commands) do
 		local raw_name = cmd.command_name
 		local user_cmd_name
 
@@ -130,16 +134,17 @@ M.register_project_user_commands = function(self)
 	end
 end
 
-M.find_and_read_file = function(self)
-	for filename in self.config.commands_files do
+M.find_and_read_file = function()
+	for _, filename in ipairs(M.config.commands_files) do
+		local root = utils.find_root(M.config.root_markers)
 		local commands_path = root .. "/" .. filename
-		if helpers.endswith(commands_path, ".lua") then
+		if utils.endswith(commands_path, ".lua") then
 			M.commands_file = commands_path
-			return utils.read_lua_file(commands_path)
+			return utils.read_lua_file(commands_path), nil
 		else
-			if helpers.endswith(commands_path, ".json") then
+			if utils.endswith(commands_path, ".json") then
 				M.commands_file = commands_path
-				return utils.read_json_file(commands_path)
+				return utils.read_json_file(commands_path), nil
 			end
 		end
 		return nil, "No valid file (.lua or .json) found."
@@ -148,11 +153,11 @@ end
 
 -- Load commands from the in-project commands file
 --     (default: nvim-commands.lua|nvim-commands.json)
-M.load = function(self)
-	local root = utils.find_root(self.config.root_markers)
+M.load = function()
+	M:find_and_read_file()
 
-	if vim.fn.filereadable(self.commands_path) == 0 then
-		print("No " .. tostring(self.commands_path) .. " found.")
+	if vim.fn.filereadable(M.commands_file) == 0 then
+		print("No file found: " .. tostring(M.commands_file))
 		return
 	end
 
@@ -166,12 +171,13 @@ M.load = function(self)
 		vim.notify("nvim_commands: no 'commands' array in " .. config_path, vim.log.levels.ERROR)
 	end
 
-	self.loaded_commands = data.commands or {}
+	M.loaded_commands = data.commands or {}
+	print(vim.inspect(M.loaded_commands))
 end
 
-M.register_universal_user_commands = function(self)
+M.register_universal_user_commands = function()
 	vim.api.nvim_create_user_command("NvimCommandsReload", function()
-		self:load()
+		M:load()
 		vim.notify("Reloaded nvim_commands from config", vim.log.levels.INFO)
 	end, { desc = "Reload nvim_commands config" })
 
@@ -187,19 +193,19 @@ M.register_universal_user_commands = function(self)
 	end, { nargs = 1, desc = "Run a named command entry: `:ProjectCommandsRun NAME`" })
 end
 
-M.register_autocommands = function(self)
+M.register_autocommands = function()
 	-- Reload when config file changes
 	vim.api.nvim_create_autocmd("BufWritePost", {
 		pattern = M.commands_file,
 		callback = function()
-			self:load()
+			M:load()
 		end,
 	})
 
 	-- Try to load when entering a new directory
 	vim.api.nvim_create_autocmd("DirChanged", {
 		callback = function()
-			self:load()
+			M:load()
 		end,
 	})
 end
@@ -245,12 +251,14 @@ M.setup = function(opts)
 	M.config = utils.merge_opts(default_config, opts)
 
 	M.project_root = utils.find_root(M.config.root_markers)
+	print("M.project_root: " .. M.project_root)
 
 	if M.config.autoload then
-		M.commands_file = M:load()
+		M:load()
 	else
 		M:find_and_read_file()
 	end
+	print("M.commands_file: " .. tostring(M.commands_file))
 
 	if M.config.create_keybinds then
 		M:register_keybinds()
